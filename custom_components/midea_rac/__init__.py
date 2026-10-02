@@ -14,7 +14,7 @@ from .api import ObloClient
 from .const import CONF_OWNER, CONF_PHONE, CONF_TOKEN, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = [Platform.CLIMATE, Platform.SENSOR]
+PLATFORMS = [Platform.CLIMATE, Platform.FAN, Platform.SELECT, Platform.SENSOR, Platform.SWITCH]
 SCAN_INTERVAL = timedelta(seconds=30)
 CONF_SERIAL = "serial"
 

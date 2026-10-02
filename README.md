@@ -23,8 +23,16 @@ get full control and sensors in Home Assistant.
 
 Each air conditioner gets:
 
-- **Climate entity**: power, target temperature (17–30 °C), HVAC mode
-  (cool / heat / auto / dry / fan only), and fan speed (Low / Medium / High / FullPower / Auto).
+- **Climate entity**: power, target temperature (17–30 °C), mode (cool / auto / dry /
+  fan only), fan speed (Low / Medium / High / Auto), presets (**Eco**, **Sleep**,
+  **Boost** = turbo), vertical swing (on = swing, off = fixed at the top) and horizontal
+  swing (on / off).
+- **Fan**: the fan speed as its own entity, so dashboards can show a speed control (with an
+  Auto preset).
+- **Gear**: Midea's FC1–FC6 capacity levels, which limit compressor power to save energy.
+  FC6 is turbo. The AC only accepts a gear in **cool** mode.
+- **Switches**: Power (resumes the last mode), Display, Self-clean, and Anti-mildew (dries the coil after the AC is
+  switched off).
 - **Sensors**: indoor (room) temperature, outdoor temperature, energy used (kWh), power (W),
   and Wi-Fi signal (dBm) and link quality as diagnostic sensors.
 
@@ -32,7 +40,7 @@ All ACs on the account are found automatically.
 
 ## Requirements
 
-- Home Assistant 2024.4 or newer. Version 2026.3 or newer is needed to show the Midea logo in
+- Home Assistant 2024.12 or newer. Version 2026.3 or newer is needed to show the Midea logo in
   the UI.
 - At least one AC set up and working in the **Midea RAC Wi-Fi V2** app.
 - The phone number you log in to the app with. A one-time OTP is sent to it by SMS.

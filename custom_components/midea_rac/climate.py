@@ -4,6 +4,12 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components.climate import (
+    PRESET_BOOST,
+    PRESET_ECO,
+    PRESET_NONE,
+    PRESET_SLEEP,
+    SWING_OFF,
+    SWING_ON,
     ClimateEntity,
     ClimateEntityFeature,
     HVACMode,
@@ -17,28 +23,34 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .api import ObloClient, ObloNode
 from .const import (
     DOMAIN,
+    FAN_MODE_TO_OBLO,
     FAN_MODES,
+    HORIZONTAL_STOP,
+    HORIZONTAL_SWING,
     SVC_AC_CONFIG_DEV,
     SVC_FAN,
+    SVC_LOUVER_DEV,
     SVC_OUTLET,
     SVC_TEMP_DEV,
     SVC_THERMO,
     SVC_THERMO_MODE,
-    THERMO_MODE,
+    VERTICAL_FIXED_TOP,
+    VERTICAL_SWING,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-# HA hvac mode <-> OBLO ThermostatMode index (1=Heating,2=Cooling,3=Auto,4=Fan,5=Dry)
+PRESET_TO_PROP = {PRESET_ECO: "eco", PRESET_SLEEP: "sleep", PRESET_BOOST: "turbo"}
+
+# HA hvac mode <-> OBLO ThermostatMode index (2=Cooling,3=Auto,4=Fan,5=Dry).
+# 1=Heating exists in the protocol but these units are cooling-only.
 HA_TO_OBLO_MODE = {
-    HVACMode.HEAT: 1,
     HVACMode.COOL: 2,
     HVACMode.AUTO: 3,
     HVACMode.FAN_ONLY: 4,
     HVACMode.DRY: 5,
 }
 OBLO_TO_HA_MODE = {
-    1: HVACMode.HEAT,
     2: HVACMode.COOL,
     3: HVACMode.AUTO,
     4: HVACMode.FAN_ONLY,
@@ -67,15 +79,20 @@ class MideaClimate(ClimateEntity):
     _attr_hvac_modes = [
         HVACMode.OFF,
         HVACMode.COOL,
-        HVACMode.HEAT,
         HVACMode.AUTO,
         HVACMode.DRY,
         HVACMode.FAN_ONLY,
     ]
     _attr_fan_modes = FAN_MODES
+    _attr_preset_modes = [PRESET_NONE, PRESET_ECO, PRESET_SLEEP, PRESET_BOOST]
+    _attr_swing_modes = [SWING_ON, SWING_OFF]
+    _attr_swing_horizontal_modes = [SWING_ON, SWING_OFF]
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.FAN_MODE
+        | ClimateEntityFeature.PRESET_MODE
+        | ClimateEntityFeature.SWING_MODE
+        | ClimateEntityFeature.SWING_HORIZONTAL_MODE
         | ClimateEntityFeature.TURN_ON
         | ClimateEntityFeature.TURN_OFF
     )
@@ -122,9 +139,27 @@ class MideaClimate(ClimateEntity):
     @property
     def fan_mode(self):
         idx = self._node.prop(SVC_FAN, "Mode")
-        if isinstance(idx, int) and 0 <= idx < len(FAN_MODES):
-            return FAN_MODES[idx]
+        for name, value in FAN_MODE_TO_OBLO.items():
+            if value == idx:
+                return name
         return None
+
+    @property
+    def preset_mode(self):
+        for preset, prop in PRESET_TO_PROP.items():
+            if self._node.prop(SVC_AC_CONFIG_DEV, prop):
+                return preset
+        return PRESET_NONE
+
+    @property
+    def swing_mode(self):
+        v = self._node.prop(SVC_LOUVER_DEV, "verticalMode")
+        return SWING_ON if v == VERTICAL_SWING else SWING_OFF
+
+    @property
+    def swing_horizontal_mode(self):
+        v = self._node.prop(SVC_LOUVER_DEV, "horizontalMode")
+        return SWING_ON if v == HORIZONTAL_SWING else SWING_OFF
 
     # ---- commands ----
     async def async_set_temperature(self, **kwargs) -> None:
@@ -157,14 +192,29 @@ class MideaClimate(ClimateEntity):
                 )
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
-        if fan_mode in FAN_MODES:
-            await self.hass.async_add_executor_job(
-                self._client.set_property,
-                self._node,
-                SVC_FAN,
-                "Mode",
-                FAN_MODES.index(fan_mode),
-            )
+        if fan_mode in FAN_MODE_TO_OBLO:
+            await self._set(SVC_FAN, "Mode", FAN_MODE_TO_OBLO[fan_mode])
+
+    async def async_set_preset_mode(self, preset_mode: str) -> None:
+        # eco / sleep / turbo are separate flags on the AC; only one is active at a time.
+        for preset, prop in PRESET_TO_PROP.items():
+            if preset != preset_mode and self._node.prop(SVC_AC_CONFIG_DEV, prop):
+                await self._set(SVC_AC_CONFIG_DEV, prop, False)
+        if preset_mode in PRESET_TO_PROP:
+            await self._set(SVC_AC_CONFIG_DEV, PRESET_TO_PROP[preset_mode], True)
+
+    async def async_set_swing_mode(self, swing_mode: str) -> None:
+        value = VERTICAL_SWING if swing_mode == SWING_ON else VERTICAL_FIXED_TOP
+        await self._set(SVC_LOUVER_DEV, "verticalMode", value)
+
+    async def async_set_swing_horizontal_mode(self, swing_horizontal_mode: str) -> None:
+        value = HORIZONTAL_SWING if swing_horizontal_mode == SWING_ON else HORIZONTAL_STOP
+        await self._set(SVC_LOUVER_DEV, "horizontalMode", value)
+
+    async def _set(self, service: str, prop: str, value) -> None:
+        await self.hass.async_add_executor_job(
+            self._client.set_property, self._node, service, prop, value
+        )
 
     async def async_turn_on(self) -> None:
         await self.hass.async_add_executor_job(
