@@ -63,6 +63,11 @@ SENSORS: list[ObloSensor] = [
         transform=lambda v: LINK_QUALITY[v] if isinstance(v, int) and 0 <= v < len(LINK_QUALITY) else v,
     ),
     ObloSensor(
+        key="indoor_temp", name="Indoor temperature", service="temperatureDEV",
+        prop="indoorTemperature", unit=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE, state_class=SensorStateClass.MEASUREMENT,
+    ),
+    ObloSensor(
         key="outdoor_temp", name="Outdoor temperature", service="temperatureDEV",
         prop="outdoorTemperature", unit=UnitOfTemperature.CELSIUS,
         device_class=SensorDeviceClass.TEMPERATURE, state_class=SensorStateClass.MEASUREMENT,

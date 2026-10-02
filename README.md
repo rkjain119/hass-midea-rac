@@ -25,8 +25,8 @@ Each air conditioner gets:
 
 - **Climate entity**: power, target temperature (17–30 °C), HVAC mode
   (cool / heat / auto / dry / fan only), and fan speed (Low / Medium / High / FullPower / Auto).
-- **Sensors**: room temperature, energy used (kWh), power (W), outdoor temperature, and
-  Wi-Fi signal (dBm) and link quality as diagnostic sensors.
+- **Sensors**: indoor (room) temperature, outdoor temperature, energy used (kWh), power (W),
+  and Wi-Fi signal (dBm) and link quality as diagnostic sensors.
 
 All ACs on the account are found automatically.
 
@@ -63,6 +63,18 @@ folder and restart Home Assistant.
 Your ACs appear as devices with a climate entity and the sensors above. The session is saved
 and the connection comes back on its own after restarts or network drops. If the session ever
 expires, Home Assistant shows a **re-authenticate** prompt that sends a new OTP.
+
+## Where to find the data
+
+- **AC controls and room temperature:** the climate card. Its "Current temperature" is the
+  indoor reading.
+- **Indoor/outdoor temperature, energy and power:** separate sensors on the AC's device page
+  and the area dashboard. The climate card has no field for outdoor temperature.
+- **Wi-Fi signal and link quality:** diagnostic sensors. Home Assistant hides these from
+  auto-generated dashboards, so look under **Diagnostic** on the device page
+  (**Settings → Devices & services → Midea RAC Wi-Fi →** your AC).
+- **Energy dashboard:** add the AC's *Energy* sensor under **Settings → Dashboards → Energy →
+  Individual devices**.
 
 ## Supported devices
 

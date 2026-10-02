@@ -18,9 +18,10 @@ from .api import ObloClient, ObloNode
 from .const import (
     DOMAIN,
     FAN_MODES,
+    SVC_AC_CONFIG_DEV,
     SVC_FAN,
     SVC_OUTLET,
-    SVC_TEMP,
+    SVC_TEMP_DEV,
     SVC_THERMO,
     SVC_THERMO_MODE,
     THERMO_MODE,
@@ -100,7 +101,10 @@ class MideaClimate(ClimateEntity):
 
     @property
     def current_temperature(self):
-        v = self._node.prop(SVC_TEMP, "Value")
+        # TemperatureService.Value only mirrors the setpoint; the room reading is here.
+        v = self._node.prop(SVC_TEMP_DEV, "indoorTemperature")
+        if v is None:
+            v = self._node.prop(SVC_AC_CONFIG_DEV, "indoorTemperature")
         return float(v) if v is not None else None
 
     @property
