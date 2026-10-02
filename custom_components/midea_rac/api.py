@@ -15,6 +15,10 @@ from .const import BROKER_HOST, BROKER_PORT
 
 _LOGGER = logging.getLogger(__name__)
 
+# The full device list can lag a pushed change by several seconds; for this long after an
+# event, keep the event's value instead of the (possibly stale) list value.
+_EVENT_HOLD = 20.0
+
 
 class ObloNode:
     """A single appliance (AC) behind the gateway."""
@@ -43,6 +47,9 @@ class ObloClient:
         self._req_topic_tpl = "oblo/{owner}/gtw/{serial}/ohm/req"
         # Responses come back addressed to the sender (cli/<token>), not the mqtt client id
         self._rsp_topic = f"oblo/{owner_id}/cli/{token}/rsp"
+        # The gateway pushes device_property_changed events here (same topic the app uses)
+        self._evt_topic = f"oblo/{owner_id}/gtw/{serial}/ohm/evt"
+        self._event_ts: dict[tuple[int, str, str], float] = {}
         self.nodes: dict[int, ObloNode] = {}
         self.gateways: set[str] = set()
         self._connected = threading.Event()
@@ -91,6 +98,7 @@ class ObloClient:
         if rc == 0:
             _LOGGER.info("Midea cloud MQTT connected")
             client.subscribe(self._rsp_topic)
+            client.subscribe(self._evt_topic, qos=1)
             self._connected.set()
             # Request the full device list as soon as we are connected
             self.refresh(self._serial)
@@ -110,14 +118,33 @@ class ObloClient:
             data = json.loads(msg.payload.decode("utf-8", "replace"))
         except Exception:  # noqa: BLE001
             return
+        if not isinstance(data, dict):
+            return
+        if data.get("name") == "device_property_changed":
+            if self._apply_event(data.get("params") or {}):
+                self._notify()
         # Full device list response contains node/service model
-        if isinstance(data, dict) and self._parse_full(data):
+        elif self._parse_full(data):
             self._first_state.set()
-            for cb in list(self._state_cbs):
-                try:
-                    cb()
-                except Exception:  # noqa: BLE001
-                    _LOGGER.exception("state callback failed")
+            self._notify()
+
+    def _notify(self) -> None:
+        for cb in list(self._state_cbs):
+            try:
+                cb()
+            except Exception:  # noqa: BLE001
+                _LOGGER.exception("state callback failed")
+
+    def _apply_event(self, params: dict) -> bool:
+        """Apply a pushed property change. Returns True if a known node changed."""
+        node = self.nodes.get(params.get("device_id"))
+        service = params.get("service_name")
+        prop = params.get("property_name")
+        if node is None or not service or not prop:
+            return False
+        node.services.setdefault(service, {})[prop] = params.get("property_value")
+        self._event_ts[(node.id, service, prop)] = time.monotonic()
+        return True
 
     # ---- parsing ----
     def _parse_full(self, data: dict) -> bool:
@@ -153,6 +180,11 @@ class ObloClient:
                 if cls.startswith("Hvac") or "ThermostatService" in services:
                     name = obj.get("device_name") or obj.get("name") or f"AC {nid}"
                     node = self.nodes.get(nid) or ObloNode(nid, name, serial or self._serial)
+                    now = time.monotonic()
+                    for (eid, sname, pname), ts in self._event_ts.items():
+                        if eid == nid and now - ts < _EVENT_HOLD:
+                            held = node.services.get(sname, {}).get(pname)
+                            services.setdefault(sname, {})[pname] = held
                     node.name = name
                     node.serial = serial or node.serial or self._serial
                     node.services = services

@@ -134,7 +134,6 @@ class MideaClimate(ClimateEntity):
         await self.hass.async_add_executor_job(
             self._client.set_property, self._node, SVC_THERMO, "Value", str(int(temp))
         )
-        self._refresh_soon()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         if hvac_mode == HVACMode.OFF:
@@ -156,7 +155,6 @@ class MideaClimate(ClimateEntity):
                     "ThermostatMode",
                     oblo,
                 )
-        self._refresh_soon()
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         if fan_mode in FAN_MODES:
@@ -167,22 +165,16 @@ class MideaClimate(ClimateEntity):
                 "Mode",
                 FAN_MODES.index(fan_mode),
             )
-        self._refresh_soon()
 
     async def async_turn_on(self) -> None:
         await self.hass.async_add_executor_job(
             self._client.set_property, self._node, SVC_OUTLET, "State", True
         )
-        self._refresh_soon()
 
     async def async_turn_off(self) -> None:
         await self.hass.async_add_executor_job(
             self._client.set_property, self._node, SVC_OUTLET, "State", False
         )
-        self._refresh_soon()
-
-    def _refresh_soon(self) -> None:
-        self.hass.async_add_executor_job(self._client.refresh, self._node.serial)
 
     async def async_added_to_hass(self) -> None:
         @callback
