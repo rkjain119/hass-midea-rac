@@ -1,0 +1,29 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Midea RAC Wi-Fi",
+        "description": "Enter the phone number you use to log in to the Midea RAC Wi-Fi V2 app. An OTP will be sent by SMS.",
+        "data": { "phone": "Phone number (+91...)" }
+      },
+      "otp": {
+        "title": "Enter OTP",
+        "description": "Enter the OTP sent to {phone}.",
+        "data": { "otp": "OTP" }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate",
+        "description": "Your Midea session expired. Enter the new OTP sent to {phone}.",
+        "data": { "otp": "OTP" }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach the Midea cloud service.",
+      "invalid_otp": "Login failed — check the OTP and try again."
+    },
+    "abort": {
+      "already_configured": "This account is already configured.",
+      "reauth_successful": "Re-authenticated successfully."
+    }
+  }
+}
